@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit-tests:
+    name: Signal-model unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -C tests
+
+  firmware:
+    name: Compile firmware (QT Py SAMD21)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/compile-sketches@v1
+        with:
+          fqbn: adafruit:samd:adafruit_qtpy_m0
+          platforms: |
+            - name: adafruit:samd
+              source-url: https://adafruit.github.io/arduino-board-index/package_adafruit_index.json
+            - name: arduino:samd
+          libraries: |
+            - name: Adafruit AS7341
+          sketch-paths: |
+            - firmware/OncoSense
+
+  python-tools:
+    name: Python tools
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r tools/requirements.txt
+      - run: python -m py_compile tools/*.py
+      - run: python tools/analyze_session.py --help
