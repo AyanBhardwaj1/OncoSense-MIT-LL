@@ -36,6 +36,6 @@ Build a **wearable arm band** that holds a light source and a miniature spectrom
 
 ## Context
 
-OncoSense was built by Ayan Bhardwaj and Eric (**EA Labs**) as student summer research in person at the MIT Lincoln Laboratory in Summer 2025, and was presented to an audience at MIT at the end of the program.
+OncoSense was built by Ayan Bhardwaj and Eric Niu as student summer research in person at the MIT Lincoln Laboratory in Summer 2025, and was presented to an audience at MIT at the end of the program.
 
 **This is a research prototype, not a medical device.** It does not diagnose skin cancer or any other condition.

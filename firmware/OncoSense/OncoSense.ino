@@ -3,7 +3,7 @@
 //  Wearable optical skin sensing: hydration, surface changes and pigment.
 //
 //  Built during student summer research, in person at the MIT Lincoln
-//  Laboratory, by Ayan Bhardwaj and Eric (EA Labs).
+//  Laboratory, by Ayan Bhardwaj and Eric Niu.
 //
 //  Hardware: Adafruit QT Py (SAMD21) + Adafruit AS7341 10-channel spectral
 //  sensor + 850 nm NIR LED + 660 nm red LED, sewn into a neoprene arm band.

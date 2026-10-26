@@ -148,7 +148,7 @@ OncoSense-MIT-LL/
 
 ## Team and acknowledgements
 
-**EA Labs:** Ayan Bhardwaj and Eric. Built as student summer research in person at the MIT Lincoln Laboratory, and presented to an audience at MIT.
+**Team:** Ayan Bhardwaj and Eric Niu. Built as student summer research in person at the MIT Lincoln Laboratory, and presented to an audience at MIT.
 
 We are grateful to:
 

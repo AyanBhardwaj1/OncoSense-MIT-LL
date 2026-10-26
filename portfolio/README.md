@@ -2,7 +2,7 @@
 
 **A wearable optical sensor for non-invasive skin monitoring**
 Student summer research in person at the MIT Lincoln Laboratory · Summer 2025
-Ayan Bhardwaj & Eric · *EA Labs*
+Ayan Bhardwaj & Eric Niu
 
 <p align="center">
   <img src="../docs/images/band-worn-electronics.jpg" width="44%" alt="OncoSense Band worn on the arm">
