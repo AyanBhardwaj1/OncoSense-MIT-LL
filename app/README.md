@@ -67,7 +67,7 @@ Both devices speak the firmware v3 serial protocol: one-character commands in, o
 ## Tests
 
 ```bash
-node --test app/tests/*.test.mjs
+node --test --test-timeout=30000 app/tests/*.test.mjs
 ```
 
 These check that the JavaScript feature extractor and network reproduce the **same test vectors** as the Python trainer and the C++ firmware. They also cover personalization, the virtual band's protocol, and the CSV/JSON export. They test the USB transport against a simulated Web Serial port too:

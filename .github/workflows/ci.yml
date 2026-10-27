@@ -50,7 +50,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node --test app/tests/*.test.mjs
+      - run: node --test --test-timeout=30000 app/tests/*.test.mjs
 
   ml:
     name: Neural network training pipeline

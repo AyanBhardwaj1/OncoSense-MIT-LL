@@ -91,10 +91,11 @@ export class DemoDevice {
   // The firmware handles one command at a time and blocks during captures,
   // so the virtual band queues commands the same way.
   send(text) {
-    this.queue = (this.queue ?? Promise.resolve()).then(async () => {
+    const run = (this.queue ?? Promise.resolve()).then(async () => {
       for (const c of text) await this.command(c);
     });
-    return this.queue;
+    this.queue = run.catch(() => {}); // a failed command must not block later ones
+    return run;
   }
 
   async command(c) {
@@ -190,14 +191,17 @@ export class DemoDevice {
 
   async capture(what, ms, fn) {
     this.busy = true;
-    this.say(`# Capturing ${what}. Hold still...`);
-    await new Promise((r) => setTimeout(r, ms));
-    if (!this.contact) {
-      this.say("# Calibration failed: check skin contact and re-seat the band.");
-    } else {
-      fn();
+    try {
+      this.say(`# Capturing ${what}. Hold still...`);
+      await new Promise((r) => setTimeout(r, ms));
+      if (!this.contact) {
+        this.say("# Calibration failed: check skin contact and re-seat the band.");
+      } else {
+        fn();
+      }
+    } finally {
+      this.busy = false;
     }
-    this.busy = false;
   }
 
   async teach(label) {

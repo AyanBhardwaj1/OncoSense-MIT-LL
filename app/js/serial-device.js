@@ -4,6 +4,16 @@
 
 export const BAUD_RATE = 115200;
 const MAX_READ_ERRORS = 3;
+const SHUTDOWN_STEP_MS = 1000;
+
+// Resolve after `promise` settles or `ms` passes, whichever is first, so a
+// stuck USB write can never hang a disconnect.
+function settleWithin(promise, ms) {
+  return Promise.race([
+    Promise.resolve(promise).catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, ms)),
+  ]);
+}
 
 export class SerialDevice {
   static supported() {
@@ -64,6 +74,7 @@ export class SerialDevice {
     // end one reader; the port stays readable and we keep going. A port
     // that keeps failing is given up on rather than retried forever.
     while (this.port?.readable && !this.closed) {
+      let gotData = false;
       const decoder = new TextDecoderStream();
       this.readableClosed = this.port.readable.pipeTo(decoder.writable).catch(() => {});
       this.reader = decoder.readable.getReader();
@@ -71,6 +82,7 @@ export class SerialDevice {
         for (;;) {
           const { value, done } = await this.reader.read();
           if (done) break;
+          gotData = true;
           consecutiveErrors = 0;
           buffer += value;
           let nl;
@@ -92,6 +104,9 @@ export class SerialDevice {
       }
       if (this.closed) return;
       if (!this.port?.readable) break;
+      // A stream that ends without delivering anything counts as a failure,
+      // so a port that keeps closing is given up on instead of spinning.
+      if (!gotData && ++consecutiveErrors >= MAX_READ_ERRORS) break;
     }
     if (!this.closed) await this.shutdown("The band closed the connection.");
   }
@@ -111,18 +126,12 @@ export class SerialDevice {
     if (this.closed) return;
     this.closed = true;
     navigator.serial.removeEventListener("disconnect", this.onDisconnect);
-    try {
-      await this.reader?.cancel();
-    } catch {
-      // Reader already errored or released; nothing to cancel.
-    }
-    await this.readableClosed;
-    try {
-      await this.writer?.close();
-    } catch {
-      // Writable already errored (unplugged); the port close below still runs.
-    }
-    await this.writableClosed;
+    // Each step is bounded: an errored reader or a writer the device never
+    // drains (e.g. stuck in its fault loop) must not block the disconnect.
+    await settleWithin(this.reader?.cancel(), SHUTDOWN_STEP_MS);
+    await settleWithin(this.readableClosed, SHUTDOWN_STEP_MS);
+    await settleWithin(this.writer?.close(), SHUTDOWN_STEP_MS);
+    await settleWithin(this.writableClosed, SHUTDOWN_STEP_MS);
     try {
       await this.port?.close();
     } catch (err) {

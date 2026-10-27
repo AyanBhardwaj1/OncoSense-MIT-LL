@@ -175,3 +175,65 @@ test("a port that keeps erroring is shut down instead of spinning", async () => 
   assert.match(reason ?? "", /Connection lost/);
   assert.equal(port.closed, true);
 });
+
+test("one failing command does not block the virtual band's queue", async () => {
+  const dev = new DemoDevice(new SkinNet(model), 5);
+  const lines = [];
+  dev.onLine((l) => lines.push(l));
+  await dev.connect();
+  const original = dev.command.bind(dev);
+  let failed = false;
+  dev.command = async (c) => {
+    if (!failed) {
+      failed = true;
+      throw new Error("boom");
+    }
+    return original(c);
+  };
+  await assert.rejects(dev.send("x"));
+  await dev.send("2");
+  await sleep(10);
+  await dev.close();
+  assert.ok(lines.includes("# Mode: scan"), "commands after a failure must still run");
+});
+
+test("a failing capture does not leave the virtual band busy forever", async () => {
+  const dev = new DemoDevice(new SkinNet(model), 6);
+  await dev.connect();
+  await assert.rejects(dev.capture("x", 1, () => {
+    throw new Error("capture bug");
+  }));
+  assert.equal(dev.busy, false);
+  await dev.close();
+});
+
+test("a stream that keeps ending without data is shut down instead of spinning", async () => {
+  const { port } = fakeSerial();
+  const dev = new SerialDevice();
+  let reason;
+  dev.onClose((r) => (reason = r));
+  await dev.connect();
+  // Every new readable closes immediately (no error, no data).
+  port.readableController.close();
+  Object.defineProperty(port, "readable", {
+    configurable: true,
+    get: () => (port.closed ? null : new ReadableStream({ start: (c) => c.close() })),
+  });
+  await sleep(50);
+  assert.match(reason ?? "", /closed the connection|Connection lost/);
+  assert.equal(port.closed, true);
+});
+
+test("shutdown does not hang when a write can never finish", async () => {
+  const { port } = fakeSerial();
+  const dev = new SerialDevice();
+  await dev.connect();
+  port.writable = null;
+  // Replace the writer with one whose close never settles (device stopped reading USB).
+  dev.writer = { write: async () => {}, close: () => new Promise(() => {}) };
+  dev.writableClosed = new Promise(() => {});
+  const t0 = Date.now();
+  await dev.close();
+  assert.ok(Date.now() - t0 < 3000, "close() must give up on a stuck writer");
+  assert.equal(port.closed, true);
+});
