@@ -15,16 +15,20 @@ class FlashStorageClass {
  public:
   explicit FlashStorageClass(const void *) {}
   T read() {
-    T value;
-    memset(&value, 0xFF, sizeof(value));  // erased flash reads as 0xFF
+    // Erased flash reads as 0xFF. Work on raw bytes, then copy into the
+    // (trivially copyable) struct, which is how the real library behaves.
+    unsigned char bytes[sizeof(T)];
+    memset(bytes, 0xFF, sizeof(bytes));
     const char *path = getenv("ONCOSENSE_FLASH");
     if (path) {
       FILE *f = fopen(path, "rb");
       if (f) {
-        if (fread(&value, sizeof(value), 1, f) != 1) memset(&value, 0xFF, sizeof(value));
+        if (fread(bytes, sizeof(bytes), 1, f) != 1) memset(bytes, 0xFF, sizeof(bytes));
         fclose(f);
       }
     }
+    T value;
+    memcpy(static_cast<void *>(&value), bytes, sizeof(value));
     return value;
   }
   void write(const T &value) {

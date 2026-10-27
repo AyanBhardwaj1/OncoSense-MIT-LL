@@ -31,8 +31,8 @@ bool saveState(const Persisted &in) {
   return true;
 }
 void eraseState() {
-  Persisted p;
-  memset(&p, 0, sizeof(p));
+  Persisted p = Persisted();  // value-initialized; magic 0 marks it invalid
+  p.magic = 0;
   gStateFlash.write(p);
 }
 }  // namespace oncosense
