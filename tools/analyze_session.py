@@ -30,17 +30,38 @@ WAVELENGTHS = {"f415": 415, "f445": 445, "f480": 480, "f515": 515, "f555": 555,
                "f590": 590, "f630": 630, "f680": 680, "nir": 910}
 
 
+NUMERIC = ["t_ms", "gain", "signal", "ambient", "metric", "trend", "melanin_idx", "erythema_idx",
+           *BANDS]
+
+
 def load(paths: list[str]) -> pd.DataFrame:
+    """Read session CSVs. Empty or unreadable files are skipped with a warning."""
     frames = []
     for p in paths:
-        df = pd.read_csv(p, comment="#")
+        try:
+            # Arduino's Serial.print writes "nan", "inf" or "ovf" for bad floats.
+            df = pd.read_csv(p, comment="#", na_values=["nan", "inf", "-inf", "ovf"])
+        except (pd.errors.EmptyDataError, pd.errors.ParserError, OSError) as err:
+            print(f"warning: skipping {p}: {err}", file=sys.stderr)
+            continue
+        if df.empty:
+            print(f"warning: skipping {p}: no data rows", file=sys.stderr)
+            continue
+        for col in NUMERIC:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
         if "label" not in df.columns:
             df["label"] = pathlib.Path(p).stem
+        df["label"] = df["label"].astype(str)
         df["file"] = pathlib.Path(p).name
         frames.append(df)
     if not frames:
-        sys.exit("No input files.")
+        return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
+
+
+def group_name(mode: str, led: str, label: str) -> str:
+    return f"{label} ({mode}, {led})"
 
 
 def good_rows(df: pd.DataFrame) -> pd.DataFrame:
@@ -50,28 +71,34 @@ def good_rows(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def summarize_scalar(df: pd.DataFrame, out: pathlib.Path) -> None:
+    """Statistics per (mode, LED, label): different light sources never share a mean."""
+    df = df.copy()
+    df["group"] = [group_name(m, l, lab) for m, l, lab in zip(df["mode"], df["led"], df["label"])]
     ok = good_rows(df)
     dropped = len(df) - len(ok)
-    stats = ok.groupby("label")["signal"].agg(["count", "mean", "std"])
+    stats = ok.groupby("group")["signal"].agg(["count", "mean", "std"])
     stats["cv_%"] = 100 * stats["std"] / stats["mean"]
-    print("\nSignal by label (rows flagged NO_CONTACT / AMBIENT_LEAK / SATURATED excluded):")
+    print("\nSignal by label, mode and LED (rows flagged NO_CONTACT / AMBIENT_LEAK / SATURATED excluded):")
     print(stats.round(5).to_string())
     if dropped:
         print(f"({dropped} flagged rows excluded)")
 
-    labels = list(stats.index)
-    if len(labels) >= 2:
+    # Cohen's d only between labels measured the same way (same mode and LED).
+    for (mode, led), g in ok.groupby(["mode", "led"]):
+        labels = list(dict.fromkeys(g["label"]))
+        if len(labels) < 2:
+            continue
         a, b = labels[0], labels[1]
-        sa, sb = ok[ok.label == a]["signal"], ok[ok.label == b]["signal"]
+        sa, sb = g[g.label == a]["signal"], g[g.label == b]["signal"]
         pooled = ((sa.var() + sb.var()) / 2) ** 0.5
         if pooled > 0:
-            print(f"\nSeparation {a} vs {b}: Cohen's d = {(sb.mean() - sa.mean()) / pooled:.2f}")
+            print(f"Separation {a} vs {b} ({mode}, {led}): Cohen's d = {(sb.mean() - sa.mean()) / pooled:.2f}")
 
     fig, axes = plt.subplots(2, 1, figsize=(9, 6), sharex=True)
-    for label, g in df.groupby("label"):
-        t = (g["t_ms"] - g["t_ms"].iloc[0]) / 1000
-        axes[0].plot(t, g["signal"], ".-", label=label, ms=3)
-        axes[1].plot(t, g["metric"], ".-", label=label, ms=3)
+    for (group, _file), g in df.groupby(["group", "file"]):
+        t = (g["t_ms"] - g["t_ms"].iloc[0]) / 1000  # time from the start of each file
+        axes[0].plot(t, g["signal"], ".-", label=group, ms=3)
+        axes[1].plot(t, g["metric"], ".-", label=group, ms=3)
     axes[0].set_ylabel("signal (basic counts)")
     axes[1].set_ylabel("score / ratio")
     axes[1].set_xlabel("time (s)")
@@ -82,6 +109,7 @@ def summarize_scalar(df: pd.DataFrame, out: pathlib.Path) -> None:
     fig.tight_layout()
     path = out / "session_timeseries.png"
     fig.savefig(path, dpi=150)
+    plt.close(fig)
     print(f"\nSaved {path}")
 
 
@@ -106,6 +134,7 @@ def summarize_spectral(df: pd.DataFrame, out: pathlib.Path) -> None:
     fig.tight_layout()
     path = out / "session_spectrum.png"
     fig.savefig(path, dpi=150)
+    plt.close(fig)
     print(f"\nSaved {path}")
 
 
@@ -118,11 +147,14 @@ def main() -> int:
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     df = load(args.files)
-    modes = set(df.get("mode", pd.Series(dtype=str)).dropna().unique())
+    if df.empty or "mode" not in df.columns:
+        print("error: no data rows in the given files", file=sys.stderr)
+        return 1
+    modes = set(df["mode"].dropna().unique())
 
     if "spectral" in modes:
         summarize_spectral(df[df["mode"] == "spectral"], out)
-    scalar = df[df["mode"].isin(["hydration", "scan"])] if "mode" in df else df
+    scalar = df[df["mode"].isin(["hydration", "scan"])]
     if len(scalar):
         summarize_scalar(scalar, out)
     return 0
