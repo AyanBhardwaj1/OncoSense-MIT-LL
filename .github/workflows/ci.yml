@@ -26,6 +26,7 @@ jobs:
             - name: arduino:samd
           libraries: |
             - name: Adafruit AS7341
+            - name: FlashStorage
           sketch-paths: |
             - firmware/OncoSense
 
@@ -40,3 +41,14 @@ jobs:
       - run: pip install -r tools/requirements.txt
       - run: python -m py_compile tools/*.py
       - run: python tools/analyze_session.py --help
+
+  ml:
+    name: Neural network training pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r ml/requirements.txt
+      - run: python ml/train.py --quick --no-export

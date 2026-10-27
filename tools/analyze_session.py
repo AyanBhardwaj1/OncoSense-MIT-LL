@@ -109,6 +109,33 @@ def summarize_spectral(df: pd.DataFrame, out: pathlib.Path) -> None:
     print(f"\nSaved {path}")
 
 
+def summarize_ai(df: pd.DataFrame, out: pathlib.Path) -> None:
+    print("\nAI predictions by label (rows with NO_CONTACT / AMBIENT_LEAK / SATURATED excluded):")
+    clean = df[~df["flags"].astype(str).str.contains("NO_CONTACT|AMBIENT_LEAK|SATURATED")]
+    table = pd.crosstab(clean["label"], clean["prediction"])
+    print(table.to_string())
+    matched = clean[clean["label"].isin(clean["prediction"].unique())]
+    if len(matched):
+        acc = (matched["label"] == matched["prediction"]).mean()
+        print(f"\nAgreement where the label is a model class: {acc:.1%} of {len(matched)} rows")
+    print("\nMean novelty / out-of-distribution by label:")
+    print(clean.groupby("label")[["novelty", "ood", "confidence"]].mean().round(3).to_string())
+
+    fig, ax = plt.subplots(figsize=(9, 3.5))
+    for label, g in df.groupby("label"):
+        t = (g["t_ms"] - g["t_ms"].iloc[0]) / 1000
+        ax.plot(t, g["confidence"], ".-", label=label, ms=3)
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("model confidence")
+    ax.set_ylim(0, 1)
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    path = out / "session_ai.png"
+    fig.savefig(path, dpi=150)
+    print(f"\nSaved {path}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("files", nargs="+")
@@ -120,6 +147,8 @@ def main() -> int:
     df = load(args.files)
     modes = set(df.get("mode", pd.Series(dtype=str)).dropna().unique())
 
+    if "ai" in modes:
+        summarize_ai(df[df["mode"] == "ai"], out)
     if "spectral" in modes:
         summarize_spectral(df[df["mode"] == "spectral"], out)
     scalar = df[df["mode"].isin(["hydration", "scan"])] if "mode" in df else df

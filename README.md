@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/MCU-Adafruit%20QT%20Py%20SAMD21-6f42c1" alt="MCU">
   <img src="https://img.shields.io/badge/sensor-AS7341%2010--channel-0e7490" alt="Sensor">
   <img src="https://img.shields.io/badge/optics-660%20%2F%20850%20nm-b91c1c" alt="Wavelengths">
-  <img src="https://img.shields.io/badge/firmware-v2.0.0-111827" alt="Firmware">
+  <img src="https://img.shields.io/badge/firmware-v3.0.0%20(neural--net)-111827" alt="Firmware">
 </p>
 
 <p align="center">
@@ -43,6 +43,7 @@ The project began with **nonlinear optics** (second harmonic generation from col
 | 📊 [Testing and results](docs/05-testing-and-results.md) | What we tested, outcomes, root causes, validation protocol |
 | 🎯 [Calibration and usage](docs/06-calibration-and-usage.md) | Step-by-step use of each mode, logging, tuning, troubleshooting |
 | 🗺️ [Roadmap](docs/07-roadmap.md) | From the hydration proof of concept back to cancer screening |
+| 🧠 [Neural network](docs/08-neural-network.md) · [ml/](ml) | Firmware v3: multi-source features, on-device MLP, novelty detection, on-band learning |
 | 🗂️ [Engineering portfolio](portfolio/README.md) | A one-page case study of the whole project |
 
 ## How it works
@@ -116,6 +117,19 @@ arduino-cli compile --upload -p <port> --fqbn adafruit:samd:adafruit_qtpy_m0 fir
 
 Then open a serial monitor at 115200 baud and type `h`. → **[firmware/README.md](firmware/README.md)**
 
+## Neural network (firmware v3)
+
+> This branch, **`neural-net`**, builds on firmware v2.
+
+Mode **4 (AI)** reads the skin under **all three light sources**, extracts **12 features** (spectral change from the wearer's baseline, plus redness and pigment shape), and runs a **12→16→12→5 neural network on the QT Py itself**. That is about 480 parameters in 2 KB of flash, with no TensorFlow needed.
+
+* **Trust signals.** Confidence, an **out-of-distribution** score (is this unlike the training data?) and a **personal novelty** score (is this unlike *my* recent readings?).
+* **On-band learning.** `t0`–`t4` labels the current skin, and the band fine-tunes its output layer on the spot. Weights are saved to flash.
+* **Training pipeline.** [`ml/`](ml) trains in pure numpy on a physics-informed skin-optics simulator, then exports C++ weights. Unit tests check the C++ against numpy.
+* **Honest status.** The bootstrap model scores 75 % on *simulated* unseen people. It needs real labelled data, and the pipeline for that is built in.
+
+→ **[docs/08-neural-network.md](docs/08-neural-network.md)**
+
 ## Results
 
 | | |
@@ -138,8 +152,9 @@ OncoSense-MIT-LL/
 ├── hardware/
 │   ├── README.md                ← BOM, wiring, mechanical design, assembly
 │   └── wiring-diagram.svg
+├── ml/                          ← skin-optics simulator, feature extractor, numpy MLP trainer
 ├── firmware/
-│   ├── OncoSense/               ← firmware v2 (config.h, Optics, SkinModel, .ino)
+│   ├── OncoSense/               ← firmware v3 (Optics, SkinModel, Features, NeuralNet, Novelty, Storage)
 │   └── legacy/                  ← original v1 sketches (MainSkin, AdaSpecCode)
 ├── tools/                       ← Python serial logger and session analyzer
 ├── tests/                       ← host-side unit tests for the signal models
