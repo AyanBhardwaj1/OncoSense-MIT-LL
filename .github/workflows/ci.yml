@@ -63,4 +63,7 @@ jobs:
           python-version: "3.11"
       - run: pip install -r tools/requirements.txt -r ml/requirements.txt pytest flake8
       - run: flake8 tools tests ml
-      - run: python -m pytest tests -q
+      - run: python -m pytest tests -q -rf --junitxml=pytest-report.xml
+      - name: Annotate failing tests
+        if: failure()
+        run: python .github/annotate_failures.py pytest-report.xml
