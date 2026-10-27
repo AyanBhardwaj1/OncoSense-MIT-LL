@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OncoSense Monitor</title>
+  <meta name="description" content="Live monitor for the OncoSense Band, a wearable optical skin sensor. Connect over USB, calibrate, and watch the on-device neural network read your skin.">
+  <meta name="theme-color" content="#f3f5f4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1312" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="OncoSense Monitor">
+  <meta property="og:description" content="Live monitor for the OncoSense Band wearable optical skin sensor.">
+  <meta property="og:image" content="assets/band-worn-electronics.jpg">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <a class="wordmark" href="./" translate="no" aria-label="OncoSense Monitor home">
+      <svg class="mark" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+        <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="3"/>
+        <circle cx="16" cy="16" r="5" fill="var(--accent)"/>
+      </svg>
+      <span>OncoSense</span>
+    </a>
+    <div class="connection" id="connection" aria-live="polite">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="connection-text">Not connected</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-quiet" id="disconnect" type="button" hidden>Disconnect</button>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+
+    <!-- Before a band is connected -->
+    <section class="welcome" id="welcome" aria-labelledby="welcome-title">
+      <div class="welcome-copy">
+        <h1 id="welcome-title">Connect your OncoSense Band</h1>
+        <p class="lede">Plug the band into this computer and watch, live, how your skin returns light: hydration, surface changes, pigment, and the band’s own neural network reading.</p>
+        <ol class="steps">
+          <li><strong>Flash firmware v3</strong> from <code translate="no">firmware/OncoSense</code> with the Arduino IDE.</li>
+          <li><strong>Plug the band in</strong> over USB-C and wear it on your inner forearm.</li>
+          <li><strong>Choose the port</strong> after pressing Connect band. It is usually named “QT Py” or “USB Serial”.</li>
+        </ol>
+        <div class="welcome-actions">
+          <button class="btn btn-primary" id="connect" type="button">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 3v5M15 3v5M6 8h12v4a6 6 0 0 1-12 0V8zM12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Connect band
+          </button>
+          <button class="btn btn-secondary" id="demo" type="button">Try the virtual band</button>
+        </div>
+        <p class="support" id="support-note" role="status"></p>
+      </div>
+      <figure class="welcome-figure">
+        <img src="assets/band-worn-electronics.jpg" width="1164" height="910" fetchpriority="high"
+             alt="The OncoSense Band on a forearm: a black neoprene band with the QT Py microcontroller and battery pack on its outer face">
+        <figcaption>The prototype band, built during student summer research in person at the MIT Lincoln Laboratory.</figcaption>
+      </figure>
+    </section>
+
+    <!-- Live dashboard -->
+    <section class="dashboard" id="dashboard" hidden aria-labelledby="dashboard-title">
+      <h1 class="visually-hidden" id="dashboard-title">Live readings from your OncoSense Band</h1>
+      <div class="toolbar">
+        <div class="tabs" role="tablist" aria-label="Measurement mode">
+          <button role="tab" type="button" id="tab-ai" data-view="ai" aria-controls="panel" aria-selected="false">AI reading</button>
+          <button role="tab" type="button" id="tab-hydration" data-view="hydration" aria-controls="panel" aria-selected="false">Hydration</button>
+          <button role="tab" type="button" id="tab-scan" data-view="scan" aria-controls="panel" aria-selected="false">Surface scan</button>
+          <button role="tab" type="button" id="tab-spectral" data-view="spectral" aria-controls="panel" aria-selected="false">Spectrum</button>
+        </div>
+        <div class="session">
+          <button class="btn btn-quiet" id="pause" type="button" aria-pressed="false">Pause</button>
+          <button class="btn btn-record" id="record" type="button" aria-pressed="false">
+            <span class="rec-dot" aria-hidden="true"></span><span id="record-label">Record session</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid" id="panel" role="tabpanel" aria-labelledby="tab-ai">
+        <div class="primary">
+          <article class="reading" aria-labelledby="reading-state">
+            <h2 class="reading-state" id="reading-state">Waiting for the first reading…</h2>
+            <p class="reading-detail" id="reading-detail">Readings arrive every one to three seconds.</p>
+            <div class="reading-action" id="reading-action" hidden></div>
+            <div class="reading-meta" id="reading-meta" hidden>
+              <div class="meter" id="meter-confidence">
+                <span class="meter-label">Confidence</span>
+                <span class="meter-value" id="value-confidence">–</span>
+              </div>
+              <div class="meter" id="meter-novelty">
+                <span class="meter-label">Novelty</span>
+                <span class="meter-value" id="value-novelty">–</span>
+              </div>
+              <div class="meter" id="meter-ood">
+                <span class="meter-label">Unfamiliarity</span>
+                <span class="meter-value" id="value-ood">–</span>
+              </div>
+            </div>
+            <ul class="flags" id="flags" aria-label="Measurement flags"></ul>
+          </article>
+
+          <section class="chart-block" id="probs-block" aria-labelledby="probs-title">
+            <h3 id="probs-title">What the network sees</h3>
+            <div class="probs" id="probs"></div>
+          </section>
+
+          <section class="chart-block" aria-labelledby="history-title">
+            <div class="chart-head">
+              <h3 id="history-title">History</h3>
+              <p class="chart-note" id="history-note"></p>
+            </div>
+            <svg class="history" id="history" viewBox="0 0 640 200" role="img" aria-label="Reading history"></svg>
+          </section>
+
+          <section class="chart-block" id="spectrum-block" aria-labelledby="spectrum-title">
+            <div class="chart-head">
+              <h3 id="spectrum-title">Spectrum</h3>
+              <p class="chart-note" id="spectrum-note"></p>
+            </div>
+            <svg class="spectrum" id="spectrum" viewBox="0 0 640 220" role="img" aria-label="Light returned by the skin in each sensor band"></svg>
+          </section>
+        </div>
+
+        <aside class="side" aria-label="Calibration and controls">
+          <section class="side-block" aria-labelledby="cal-title">
+            <h3 id="cal-title">Calibration</h3>
+            <p class="side-note" id="cal-note"></p>
+            <ul class="cal-steps" id="cal-steps"></ul>
+          </section>
+
+          <section class="side-block" id="teach-block" aria-labelledby="teach-title">
+            <h3 id="teach-title">Teach the network</h3>
+            <p class="side-note">Tell the band what your skin is like right now. It fine-tunes its last layer on the spot, and keeps it after power-off.</p>
+            <div class="teach" id="teach"></div>
+            <p class="side-note" id="teach-status"></p>
+            <button class="btn btn-quiet btn-small" id="reset-net" type="button">Reset to factory weights</button>
+          </section>
+
+          <section class="side-block" id="skin-block" aria-labelledby="skin-title" hidden>
+            <h3 id="skin-title">Virtual skin</h3>
+            <p class="side-note">Demo only. Change the simulated skin under the virtual band and watch the readings respond.</p>
+            <label class="slider">
+              <span>Hydration <output id="out-hydration" for="skin-hydration">55&nbsp;%</output></span>
+              <input type="range" id="skin-hydration" name="skin-hydration" min="0" max="100" value="55" autocomplete="off">
+            </label>
+            <label class="slider">
+              <span>Occlusive film <output id="out-occlusive" for="skin-occlusive">0&nbsp;%</output></span>
+              <input type="range" id="skin-occlusive" name="skin-occlusive" min="0" max="100" value="0" autocomplete="off">
+            </label>
+            <label class="slider">
+              <span>Redness <output id="out-erythema" for="skin-erythema">0&nbsp;%</output></span>
+              <input type="range" id="skin-erythema" name="skin-erythema" min="0" max="100" value="0" autocomplete="off">
+            </label>
+            <label class="check">
+              <input type="checkbox" id="skin-contact" name="skin-contact" checked>
+              <span>Band touching skin</span>
+            </label>
+          </section>
+
+          <section class="side-block" aria-labelledby="session-title">
+            <h3 id="session-title">Session</h3>
+            <p class="side-note" id="session-status">Not recording. Recorded readings stay in this browser until you export them.</p>
+            <div class="export">
+              <button class="btn btn-secondary btn-small" id="export-csv" type="button" disabled>Export CSV</button>
+              <button class="btn btn-secondary btn-small" id="export-jsonl" type="button" disabled>Export JSON</button>
+            </div>
+            <button class="btn btn-danger btn-small" id="clear-cal" type="button">Clear all calibration</button>
+          </section>
+
+          <details class="side-block log">
+            <summary>Device messages</summary>
+            <pre id="log" aria-live="off"></pre>
+          </details>
+        </aside>
+      </div>
+    </section>
+
+    <p class="toast" id="toast" role="status" aria-live="polite"></p>
+  </main>
+
+  <footer class="footer">
+    <p><strong translate="no">OncoSense</strong> is a research prototype, not a medical device. It does not diagnose skin cancer or any other condition.</p>
+    <p>By Ayan Bhardwaj and Eric Niu · student summer research in person at the MIT Lincoln Laboratory · <a href="https://github.com/AyanBhardwaj1/OncoSense-MIT-LL">Source on GitHub</a></p>
+  </footer>
+</body>
+</html>

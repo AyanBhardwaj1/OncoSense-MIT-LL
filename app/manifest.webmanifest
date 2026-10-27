@@ -1,0 +1,13 @@
+{
+  "name": "OncoSense Monitor",
+  "short_name": "OncoSense",
+  "description": "Live monitor for the OncoSense Band wearable optical skin sensor.",
+  "start_url": "./?view=ai",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1312",
+  "theme_color": "#0f1312",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
