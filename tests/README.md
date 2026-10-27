@@ -6,8 +6,10 @@ Every piece of code in this repository runs in a test on a laptop, and in CI on 
 |---|---|---|
 | **Signal-model unit tests** | `SkinModel.cpp`: trimmed mean, trend, two-point hydration score, reference separation, v1 compatibility, surface scan, pigment indices | `make -C tests` |
 | **Firmware in the loop** | The **real, unmodified firmware** (`firmware/OncoSense/*.ino` + `*.cpp`), compiled for the host against simulated Arduino, AS7341 and flash hardware with a virtual clock (`tests/firmware_sim/`). Tests drive it through its serial commands | `python -m pytest tests/firmware_sim -q` |
+| **AI pipeline (C++)** | `Features.cpp`, `NeuralNet.cpp` and `Novelty.cpp` reproduce numpy's output on exported vectors; personalization learns and resets | `make -C tests` |
+| **Training (Python)** | Simulator physics sanity checks, labels, a **numerical gradient check** of backprop, float-literal export that always compiles, the model fingerprint, and `--real` filtering | `python -m pytest tests/test_ml.py -q` |
 | **Tools** | Logger line routing and file naming, analyzer loading, grouping, statistics and plots | `python -m pytest tests/test_tools.py -q` |
-| **End to end** | Firmware CSV output → logger session files → analyzer report | included in the firmware-in-the-loop suite |
+| **End to end** | Firmware AI-mode CSV → logger session files → analyzer report and `train.py --real` | included in the firmware-in-the-loop suite |
 
 ```bash
 make -C tests

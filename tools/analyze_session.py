@@ -143,7 +143,8 @@ def summarize_ai(df: pd.DataFrame, out: pathlib.Path) -> None:
     clean = df[~df["flags"].astype(str).str.contains("NO_CONTACT|AMBIENT_LEAK|SATURATED")]
     table = pd.crosstab(clean["label"], clean["prediction"])
     print(table.to_string())
-    matched = clean[clean["label"].isin(clean["prediction"].unique())]
+    classes = [c[2:] for c in df.columns if c.startswith("p_")]  # the model's classes
+    matched = clean[clean["label"].isin(classes)]
     if len(matched):
         acc = (matched["label"] == matched["prediction"]).mean()
         print(f"\nAgreement where the label is a model class: {acc:.1%} of {len(matched)} rows")
@@ -151,8 +152,8 @@ def summarize_ai(df: pd.DataFrame, out: pathlib.Path) -> None:
     print(clean.groupby("label")[["novelty", "ood", "confidence"]].mean().round(3).to_string())
 
     fig, ax = plt.subplots(figsize=(9, 3.5))
-    for label, g in df.groupby("label"):
-        t = (g["t_ms"] - g["t_ms"].iloc[0]) / 1000
+    for (label, _file), g in df.groupby(["label", "file"]):
+        t = (g["t_ms"] - g["t_ms"].iloc[0]) / 1000  # time from the start of each file
         ax.plot(t, g["confidence"], ".-", label=label, ms=3)
     ax.set_xlabel("time (s)")
     ax.set_ylabel("model confidence")
@@ -162,6 +163,7 @@ def summarize_ai(df: pd.DataFrame, out: pathlib.Path) -> None:
     fig.tight_layout()
     path = out / "session_ai.png"
     fig.savefig(path, dpi=150)
+    plt.close(fig)
     print(f"\nSaved {path}")
 
 

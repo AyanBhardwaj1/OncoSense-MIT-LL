@@ -182,3 +182,16 @@ def test_analyzer_spectral_summary(tmp_path):
     res = analyze(write(tmp_path / "sp.csv", rows, header=header), out=tmp_path / "figs")
     assert res.returncode == 0, res.stderr
     assert (tmp_path / "figs" / "session_spectrum.png").exists()
+
+
+def test_ai_agreement_counts_every_row_labelled_with_a_class(tmp_path):
+    """Regression: rows whose label the model never predicted were dropped, inflating agreement."""
+    classes = ["very_dry", "dry", "normal", "well_hydrated", "occlusive"]
+    feats = [f"d{i}" for i in range(12)]
+    header = ("t_ms,mode,prediction,confidence," + ",".join(f"p_{c}" for c in classes)
+              + ",novelty,ood," + ",".join(feats) + ",flags,label")
+    row = "{t},ai,normal,0.9," + ",".join(["0.2"] * 5) + ",1.0,0.5," + ",".join(["0.0"] * 12) + ",OK,{label}"
+    rows = [row.format(t=i * 1000, label=lab) for i, lab in enumerate(["dry"] * 3 + ["normal"] * 3)]
+    res = analyze(write(tmp_path / "ai.csv", rows, header=header), out=tmp_path / "figs")
+    assert res.returncode == 0, res.stderr
+    assert "50.0% of 6 rows" in res.stdout
