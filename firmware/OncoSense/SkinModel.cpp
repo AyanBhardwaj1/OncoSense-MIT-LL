@@ -19,7 +19,7 @@ float trimmedMean(const float *values, int n) {
 }
 
 float Ema::update(float x) {
-  if (isnan(x)) return value_;
+  if (isnan(x)) return value();
   if (!primed_) {
     value_ = x;
     primed_ = true;
@@ -61,13 +61,15 @@ const char *toString(HydrationState s) {
   }
 }
 
-float hydrationScore(float signal, float dryRef, float hydratedRef) {
-  float span = hydratedRef - dryRef;
+bool referencesSeparable(float dryRef, float hydratedRef) {
+  if (isnan(dryRef) || isnan(hydratedRef)) return false;
   float scale = fabsf(dryRef) > fabsf(hydratedRef) ? fabsf(dryRef) : fabsf(hydratedRef);
-  if (isnan(signal) || scale <= 0.0f || fabsf(span) < kMinReferenceSeparation * scale) {
-    return NAN;
-  }
-  return 100.0f * (signal - dryRef) / span;
+  return scale > 0.0f && fabsf(hydratedRef - dryRef) >= kMinReferenceSeparation * scale;
+}
+
+float hydrationScore(float signal, float dryRef, float hydratedRef) {
+  if (isnan(signal) || !referencesSeparable(dryRef, hydratedRef)) return NAN;
+  return 100.0f * (signal - dryRef) / (hydratedRef - dryRef);
 }
 
 HydrationState classifyScore(float score) {

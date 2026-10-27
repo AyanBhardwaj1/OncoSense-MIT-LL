@@ -154,6 +154,9 @@ static void handleCommand(char c) {
       if (captureAverage(hydrationLed, hydrationChannel(), value)) {
         if (cal.hydrationLed != hydrationLed) {
           // References from a different LED are meaningless now.
+          if (!isnan(cal.dryRef) || !isnan(cal.hydratedRef)) {
+            info(F("References captured with the other LED were discarded."));
+          }
           cal.dryRef = NAN;
           cal.hydratedRef = NAN;
           cal.hydrationLed = hydrationLed;
@@ -161,6 +164,11 @@ static void handleCommand(char c) {
         (c == 'd' ? cal.dryRef : cal.hydratedRef) = value;
         Serial.print(F("# Reference = "));
         Serial.println(value, 4);
+        if (!isnan(cal.dryRef) && !isnan(cal.hydratedRef) &&
+            !referencesSeparable(cal.dryRef, cal.hydratedRef)) {
+          info(F("Dry and moisturized references are too close (< 3 % apart) to score between."));
+          info(F("Recapture after a bigger change in the skin."));
+        }
         trend.reset();
       }
       break;
@@ -380,8 +388,12 @@ static void runSpectral() {
   float r[12];
   for (uint8_t b = 0; b < kNumBands; b++) {
     uint8_t ch = kBands[b];
-    r[ch] = cal.hasWhite && cal.white[ch] > 0.0f ? f.signal[ch] / cal.white[ch]
-                                                 : f.signal[ch];
+    if (!cal.hasWhite) {
+      r[ch] = f.signal[ch];
+    } else {
+      // A band the card returned no light in has no reflectance (not raw units).
+      r[ch] = cal.white[ch] > 0.0f ? f.signal[ch] / cal.white[ch] : NAN;
+    }
   }
   float mi = cal.hasWhite ? melaninIndex(r[AS7341_CHANNEL_630nm_F7]) : NAN;
   float ei = cal.hasWhite ? erythemaIndex(r[AS7341_CHANNEL_630nm_F7],
@@ -455,15 +467,16 @@ static void captureWhiteReference() {
   info(F("Capturing white reference. Hold a white card flat on the sensor..."));
   float sum[12] = {0};
   int n = 0;
-  for (int i = 0; i < CALIBRATION_MEASUREMENTS; i++) {
+  for (int i = 0; i < CALIBRATION_MEASUREMENTS * 2 && n < CALIBRATION_MEASUREMENTS; i++) {
     Frame f;
     if (!optics.measure(LightSource::OnboardWhite, AS7341_CHANNEL_CLEAR, f)) continue;
-    if (f.saturated) continue;
+    // Like every capture: no target in front of the sensor (or saturation) is rejected.
+    if (!hasContact(f) || f.saturated) continue;
     for (uint8_t b = 0; b < kNumBands; b++) sum[kBands[b]] += f.signal[kBands[b]];
     n++;
   }
-  if (n == 0) {
-    info(F("White reference failed (sensor saturated or not responding)."));
+  if (n < CALIBRATION_MEASUREMENTS / 2) {
+    info(F("White reference failed: hold a white card flat against the sensor."));
     return;
   }
   for (uint8_t b = 0; b < kNumBands; b++) cal.white[kBands[b]] = sum[kBands[b]] / n;

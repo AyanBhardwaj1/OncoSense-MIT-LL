@@ -32,6 +32,8 @@ static void testTrimmedMean() {
 
 static void testEma() {
   Ema e(0.5f);
+  CHECK(isnan(e.value()));               // no sample yet: no trend, not 0
+  CHECK(isnan(e.update(NAN)));           // invalid samples don't prime it
   CHECK_NEAR(e.update(10), 10, 1e-6f);   // first sample primes the filter
   CHECK_NEAR(e.update(20), 15, 1e-6f);
   CHECK_NEAR(e.update(NAN), 15, 1e-6f);  // NaN is ignored
@@ -52,6 +54,14 @@ static void testHydrationScore() {
   CHECK(isnan(hydrationScore(1.0f, 1.0f, 1.01f)));
   CHECK(isnan(hydrationScore(NAN, 1.0f, 2.0f)));
   CHECK(isnan(hydrationScore(1.0f, 0.0f, 0.0f)));
+}
+
+static void testReferenceSeparation() {
+  CHECK(referencesSeparable(1.0f, 2.0f));
+  CHECK(referencesSeparable(2.0f, 1.0f));
+  CHECK(!referencesSeparable(1.0f, 1.01f));  // < 3 % apart
+  CHECK(!referencesSeparable(NAN, 1.0f));
+  CHECK(!referencesSeparable(0.0f, 0.0f));
 }
 
 static void testClassifyScore() {
@@ -112,6 +122,7 @@ int main() {
   testTrimmedMean();
   testEma();
   testHydrationScore();
+  testReferenceSeparation();
   testClassifyScore();
   testLegacyCompatibility();
   testSurfaceScan();
