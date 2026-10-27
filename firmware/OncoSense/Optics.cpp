@@ -61,11 +61,18 @@ float Optics::gainX() const {
   return gain_ == AS7341_GAIN_0_5X ? 0.5f : (float)(1UL << ((uint8_t)gain_ - 1));
 }
 
+void Optics::applyGain(as7341_gain_t g) {
+  if (g != gain_) {
+    gain_ = g;
+    as7341_.setGain(gain_);
+  }
+}
+
 bool Optics::stepGain(int direction) {
   int next = (int)gain_ + direction;
   if (next < (int)AS7341_GAIN_0_5X || next > (int)AS7341_GAIN_512X) return false;
-  gain_ = (as7341_gain_t)next;
-  as7341_.setGain(gain_);
+  applyGain((as7341_gain_t)next);
+  sourceGain_[activeSource_] = gain_;
   return true;
 }
 
@@ -91,6 +98,8 @@ bool Optics::measure(LightSource src, as7341_color_channel_t watch, Frame &out) 
   uint16_t litRaw[12], darkRaw[12];
 
   out.ok = false;
+  activeSource_ = (uint8_t)src;
+  applyGain(sourceGain_[activeSource_]);
   for (uint8_t attempt = 0; attempt <= kMaxGainRetries; attempt++) {
     out.peakRaw = 0;
     out.minDeltaRaw = 65535;

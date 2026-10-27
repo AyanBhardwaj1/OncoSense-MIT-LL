@@ -7,7 +7,7 @@
 #include <Adafruit_AS7341.h>
 
 // ---------------------------------------------------------------- Firmware --
-#define ONCOSENSE_FW_VERSION "2.0.0"
+#define ONCOSENSE_FW_VERSION "3.0.0"
 
 // ------------------------------------------------------------------- Board --
 // Reference build: Adafruit QT Py SAMD21 (M0) + Adafruit AS7341 over STEMMA QT.
@@ -62,3 +62,13 @@
 // If ambient light is more than this fraction of the LED-on reading, the band
 // is letting room light leak in under the optical head.
 #define MAX_AMBIENT_FRACTION 0.50f
+
+// ------------------------------------------------------------- AI mode --
+// Scans averaged when capturing the wearer's AI baseline (command `a`).
+#define AI_BASELINE_SCANS 4
+// Scans recorded as labelled examples when teaching the network (`t` + 0-4).
+#define TEACH_SCANS 3
+// RMS z-score above which a reading is reported as unusual for this wearer.
+#define NOVELTY_THRESHOLD 3.0f
+// RMS z-score above which a reading is outside the model's training data.
+#define OOD_THRESHOLD 3.0f

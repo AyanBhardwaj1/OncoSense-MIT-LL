@@ -59,9 +59,14 @@ class Optics {
   bool readRaw(uint16_t *buf);
   void setLight(LightSource src, bool on);
   bool stepGain(int direction);
+  void applyGain(as7341_gain_t g);
 
   Adafruit_AS7341 as7341_;
-  as7341_gain_t gain_ = AS_GAIN_START;
+  // Each light source keeps its own auto-gain state, so cycling sources in
+  // AI mode doesn't make the gain hunt back and forth.
+  as7341_gain_t sourceGain_[3] = {AS_GAIN_START, AS_GAIN_START, AS_GAIN_START};
+  as7341_gain_t gain_ = AS_GAIN_START;      // gain currently set on the sensor
+  uint8_t activeSource_ = 0;
   float tintMs_ = 0.0f;
   uint16_t fullScale_ = 65535;
 };
