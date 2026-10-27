@@ -117,4 +117,11 @@ python ml/train.py --real data/*.csv
 * personalization learns a new label, rejects invalid labels, and resets cleanly
 * the novelty detector warms up, accepts typical jitter, and flags large jumps
 
-CI also runs the training pipeline (`--quick`) and compiles the firmware with `FlashStorage` for the QT Py SAMD21.
+`python -m pytest tests` runs the **real firmware in a hardware simulator** (`tests/firmware_sim`) through complete AI sessions. It checks:
+
+* the band's prediction against numpy on the same simulated skin
+* teaching, and that it survives a reboot
+* that a stale personalized head is dropped when the weights change
+* that light-leak frames never train the novelty model
+
+It also runs a numerical gradient check of the trainer. CI runs all of this, the training pipeline (`--quick`), and a compile of the firmware with `FlashStorage` for the QT Py SAMD21.

@@ -103,7 +103,7 @@ Every reading carries flags so bad data is never silently trusted:
 | `1` / `2` / `3` / `4` | Hydration / surface-scan / spectral / **AI** mode |
 | `n` / `c` / `j` | Readable / CSV / **JSON-lines** output (each sets the format; none toggles) |
 | `a` | Capture the multi-source **AI baseline** on clean, normal skin |
-| `t` then `0`–`4` | **Teach** the network: label the current skin (0 very_dry … 4 occlusive) |
+| `t` then `0`–`4` | **Teach** the network: label the current skin (0 very_dry … 4 occlusive). Send both characters together (`t2`). A lone `t` expires after 5 s, so a later mode key is never taken as a label |
 | `r` | Reset the network to factory weights |
 | `l` | Switch the hydration LED between 660 nm (F8 channel) and 850 nm (NIR channel) |
 | `d` | Capture the **dry** reference (e.g. right after an alcohol wipe) |
@@ -114,7 +114,7 @@ Every reading carries flags so bad data is never silently trusted:
 | `p` | Pause / resume streaming |
 | `s` | Status · `h` help |
 
-Calibration and personalization are saved to flash after every capture and restored at boot. Flash is erased whenever new firmware is uploaded.
+Calibration, the hydration LED it was captured with, and personalization are saved to flash after every capture and restored at boot. Streaming never writes to flash. A personalized network is only restored if it was trained on the same weights: each export carries a fingerprint (`ONCOSENSE_MODEL_ID`). On SAMD21, flash is erased whenever new firmware is uploaded.
 
 See [docs/08-neural-network.md](../docs/08-neural-network.md) for AI mode and [docs/06-calibration-and-usage.md](../docs/06-calibration-and-usage.md) for the full calibration protocol.
 

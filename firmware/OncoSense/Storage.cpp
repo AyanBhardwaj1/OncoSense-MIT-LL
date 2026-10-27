@@ -6,7 +6,7 @@ namespace oncosense {
 
 #if defined(ARDUINO_ARCH_SAMD) || defined(ARDUINO_ARCH_ESP32)
 static const uint32_t kMagic = 0x4F4E4353;  // "ONCS"
-static const uint16_t kVersion = 3;
+static const uint16_t kVersion = 4;  // bump when Persisted changes
 
 static bool valid(const Persisted &p) { return p.magic == kMagic && p.version == kVersion; }
 #endif

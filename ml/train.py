@@ -16,15 +16,17 @@ Outputs
                                        inference is checked against numpy
 
 Only numpy is required. Real data comes from tools/oncosense_logger.py in AI
-mode with JSON output converted by --real (see ml/README.md).
+mode with CSV output and a --label that is a class name (see ml/README.md).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import pathlib
 import sys
+import zlib
 
 import numpy as np
 
@@ -52,21 +54,54 @@ def simulate(n_people: int, per_person: int, seed: int):
     return np.array(X), np.array(y), np.array(groups)
 
 
+# Readings the band itself marked as untrustworthy never become training data.
+BAD_FLAGS = ("NO_CONTACT", "SATURATED", "AMBIENT_LEAK")
+
+
 def load_real(paths: list[str]):
-    """CSV rows with columns: label, then the 12 feature columns (see ml/README.md)."""
+    """Load AI-mode CSVs recorded by the logger with a class-name --label.
+
+    Returns (X, y, report). Files without the feature columns (other modes) or
+    without a label column are skipped; rows flagged by the firmware, rows with
+    non-finite features and rows whose label is not a class are skipped and
+    counted in `report`.
+    """
     X, y = [], []
+    report = {"rows": 0, "flagged": 0, "non_finite": 0, "unknown_label": 0, "skipped_files": 0}
     for p in paths:
         with open(p, encoding="utf-8") as f:
             header = f.readline().strip().split(",")
+            if not set(FEATURE_NAMES) <= set(header) or "label" not in header:
+                why = "no label column" if "label" not in header else "not an AI-mode file"
+                print(f"note: skipping {p} ({why})", file=sys.stderr)
+                report["skipped_files"] += 1
+                continue
             idx = [header.index(n) for n in FEATURE_NAMES]
             li = header.index("label")
+            fi = header.index("flags") if "flags" in header else None
+            pi = header.index("prediction") if "prediction" in header else None
             for line in f:
                 cols = line.strip().split(",")
-                if len(cols) != len(header) or cols[li] not in sim.CLASSES:
+                if len(cols) != len(header):
                     continue
-                X.append([float(cols[i]) for i in idx])
+                report["rows"] += 1
+                if (fi is not None and any(b in cols[fi] for b in BAD_FLAGS)) or \
+                        (pi is not None and cols[pi] == "no_contact"):
+                    report["flagged"] += 1
+                    continue
+                if cols[li] not in sim.CLASSES:
+                    report["unknown_label"] += 1
+                    continue
+                try:
+                    feats = [float(cols[i]) for i in idx]
+                except ValueError:
+                    feats = [math.nan]
+                if not all(math.isfinite(v) for v in feats):
+                    report["non_finite"] += 1
+                    continue
+                X.append(feats)
                 y.append(sim.CLASSES.index(cols[li]))
-    return np.array(X), np.array(y)
+    return np.array(X).reshape(-1, len(FEATURE_NAMES)), np.array(y, dtype=int), report
 
 
 # ----------------------------------------------------------------- model --
@@ -91,26 +126,32 @@ def forward(params, X):
     return acts, e / e.sum(axis=1, keepdims=True)
 
 
+def gradients(params, X, y, l2=1e-4):
+    """Mean cross-entropy gradients (+ L2 on weights) by backpropagation."""
+    acts, probs = forward(params, X)
+    grad = probs.copy()
+    grad[np.arange(len(X)), y] -= 1
+    grad /= len(X)
+    grads = [None] * len(params)
+    for li in range(len(params) // 2 - 1, -1, -1):
+        W = params[2 * li]
+        grads[2 * li] = grad.T @ acts[li] + l2 * W
+        grads[2 * li + 1] = grad.sum(axis=0)
+        if li > 0:
+            grad = (grad @ W) * (acts[li] > 0)
+    return grads
+
+
 def train(X, y, params, epochs, lr=3e-3, l2=1e-4, batch=128, seed=0):
     rng = np.random.default_rng(seed)
     m = [np.zeros_like(p) for p in params]
     v = [np.zeros_like(p) for p in params]
     t = 0
-    for epoch in range(epochs):
+    for _ in range(epochs):
         order = rng.permutation(len(X))
         for s in range(0, len(X), batch):
             idx = order[s:s + batch]
-            acts, probs = forward(params, X[idx])
-            grad = probs.copy()
-            grad[np.arange(len(idx)), y[idx]] -= 1
-            grad /= len(idx)
-            grads = [None] * len(params)
-            for li in range(len(params) // 2 - 1, -1, -1):
-                W = params[2 * li]
-                grads[2 * li] = grad.T @ acts[li] + l2 * W
-                grads[2 * li + 1] = grad.sum(axis=0)
-                if li > 0:
-                    grad = (grad @ W) * (acts[li] > 0)
+            grads = gradients(params, X[idx], y[idx], l2)
             t += 1
             for k, g in enumerate(grads):
                 m[k] = 0.9 * m[k] + 0.1 * g
@@ -138,18 +179,39 @@ def evaluate(params, X, y, name):
 
 # ---------------------------------------------------------------- export --
 
+def c_float(x: float) -> str:
+    """A C++ float literal that always compiles (never `0f`, `1f`, `nanf`)."""
+    x = float(np.float32(x))
+    if not math.isfinite(x):
+        raise ValueError(f"non-finite value {x} cannot be exported")
+    text = repr(x)
+    if "." not in text and "e" not in text:
+        text += ".0"
+    return text + "f"
+
+
 def c_array(name, arr):
-    flat = ", ".join(f"{x:.8g}f" for x in np.asarray(arr, dtype=np.float64).ravel())
+    flat = ", ".join(c_float(x) for x in np.asarray(arr, dtype=np.float64).ravel())
     return f"static const float {name}[{np.size(arr)}] = {{{flat}}};\n"
 
 
-def export(params, mean, std, meta, X_test):
+def model_id(params, mean, std) -> int:
+    """Fingerprint of the exported network (float32 bytes, CRC-32)."""
+    blob = b"".join(np.asarray(a, dtype=np.float32).tobytes() for a in [mean, std, *params])
+    return zlib.crc32(blob) & 0xFFFFFFFF
+
+
+def export(params, mean, std, meta, X_test, root=ROOT):
     W1, b1, W2, b2, W3, b3 = params
+    mid = model_id(params, mean, std)
     header = [
         "// Generated by ml/train.py. Do not edit by hand.\n",
         f"// Training data: {meta['data']}\n",
         f"// Held-out accuracy (people not seen in training): {meta['accuracy']:.3f}\n",
         "#pragma once\n\n",
+        "// Fingerprint of these weights. A personalized head saved to flash is only\n",
+        "// restored when it was trained on the same network.\n",
+        f"#ifndef ONCOSENSE_MODEL_ID\n#define ONCOSENSE_MODEL_ID 0x{mid:08X}u\n#endif\n\n",
         "namespace oncosense {\nnamespace model {\n\n",
         f"static const int kInputs = {LAYERS[0]};\n",
         f"static const int kHidden1 = {LAYERS[1]};\n",
@@ -165,15 +227,17 @@ def export(params, mean, std, meta, X_test):
         c_array("kW3", W3), c_array("kB3", b3),
         "\n}  // namespace model\n}  // namespace oncosense\n",
     ]
-    (ROOT / "firmware/OncoSense/model_weights.h").write_text("".join(header))
+    (root / "firmware/OncoSense/model_weights.h").write_text("".join(header))
 
     model = {
         "classes": sim.CLASSES, "features": FEATURE_NAMES, "layers": LAYERS,
         "mean": mean.tolist(), "std": std.tolist(),
-        "weights": [p.tolist() for p in params], "meta": meta,
+        "weights": [p.tolist() for p in params], "meta": meta, "model_id": mid,
     }
-    for path in ("ml/model.json", "app/model.json"):
-        (ROOT / path).write_text(json.dumps(model, separators=(",", ":")))
+    text = json.dumps(model, separators=(",", ":"), allow_nan=False)
+    (root / "ml/model.json").write_text(text)
+    if (root / "app").is_dir():  # the web app's demo mode uses the same weights
+        (root / "app/model.json").write_text(text)
 
     # Test vectors: raw features -> expected probabilities.
     raw = X_test[:6]
@@ -197,7 +261,7 @@ def export(params, mean, std, meta, X_test):
               "static const int kNumFeatureVectors = 4;\n",
               c_array("kFeatScans", np.array(scans)), c_array("kFeatBases", np.array(bases)),
               c_array("kFeatExpected", np.array(feats))]
-    (ROOT / "tests/nn_test_vectors.h").write_text("".join(lines))
+    (root / "tests/nn_test_vectors.h").write_text("".join(lines))
 
 
 # ------------------------------------------------------------------ main --
@@ -226,16 +290,24 @@ def main() -> int:
     acc = evaluate(params, Xs[test_people], y[test_people], "Simulated, held-out people")
     data = f"simulated ({args.people} virtual people x {args.per_person} states)"
 
+    meta = {"data": data, "accuracy": round(float(acc), 4)}
     if args.real:
-        Xr, yr = load_real(args.real)
-        if len(Xr):
-            print(f"\nFine-tuning on {len(Xr)} real labelled scans")
-            params = train((Xr - mean) / std, yr, params, max(20, args.epochs // 2), lr=1e-3)
-            evaluate(params, (Xr - mean) / std, yr, "Real data (training fit, not a held-out score)")
-            data += f" + {len(Xr)} real scans"
+        Xr, yr, report = load_real(args.real)
+        print(f"\nReal data: {report['rows']} rows read; skipped {report['flagged']} flagged by the band, "
+              f"{report['unknown_label']} with a label that is not a class {sim.CLASSES}, "
+              f"{report['non_finite']} with non-finite features, {report['skipped_files']} non-AI files")
+        if not len(Xr):
+            print("error: no usable real rows to fine-tune on", file=sys.stderr)
+            return 1
+        print(f"Fine-tuning on {len(Xr)} real labelled scans")
+        params = train((Xr - mean) / std, yr, params, max(20, args.epochs // 2), lr=1e-3)
+        evaluate(params, (Xr - mean) / std, yr, "Real data (training fit, not a held-out score)")
+        # Re-score the exported (fine-tuned) weights on the held-out simulated people.
+        acc = evaluate(params, Xs[test_people], y[test_people], "Simulated, held-out people (after fine-tune)")
+        meta = {"data": f"{data} + {len(Xr)} real scans", "accuracy": round(float(acc), 4)}
 
     if not args.no_export:
-        export(params, mean, std, {"data": data, "accuracy": round(float(acc), 4)}, X[test_people])
+        export(params, mean, std, meta, X[test_people])
         print("\nExported firmware/OncoSense/model_weights.h, ml/model.json, tests/nn_test_vectors.h")
     return 0
 

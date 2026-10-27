@@ -45,6 +45,7 @@ The project began with **nonlinear optics** (second harmonic generation from col
 | 🗺️ [Roadmap](docs/07-roadmap.md) | From the hydration proof of concept back to cancer screening |
 | 🧠 [Neural network](docs/08-neural-network.md) · [ml/](ml) | Firmware v3: multi-source features, on-device MLP, novelty detection, on-band learning |
 | 🖥️ [Web app](docs/09-web-app.md) · [app/](app) | OncoSense Monitor: browser dashboard that connects to the band over USB, with a virtual-band demo |
+| 🧪 [Tests](tests/README.md) | Unit tests, the firmware running in a hardware simulator, tool tests, and end-to-end checks |
 | 🗂️ [Engineering portfolio](portfolio/README.md) | A one-page case study of the whole project |
 
 ## How it works
@@ -175,7 +176,7 @@ OncoSense-MIT-LL/
 │   └── legacy/                  ← original v1 sketches (MainSkin, AdaSpecCode)
 ├── app/                         ← OncoSense Monitor web app (Web Serial dashboard + virtual band)
 ├── tools/                       ← Python serial logger and session analyzer
-├── tests/                       ← host-side unit tests for the signal models
+├── tests/                       ← unit tests, firmware-in-the-loop simulator, tool tests
 └── .github/workflows/ci.yml     ← unit tests and firmware compile on every push
 ```
 

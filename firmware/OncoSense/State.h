@@ -32,6 +32,7 @@ struct Persisted {
   uint16_t version;
   Calibration cal;
   bool headValid;
+  uint32_t modelId;  // which network the personalized head was trained on
   float headW[NeuralNet::kClasses * NeuralNet::kHidden];
   float headB[NeuralNet::kClasses];
 };

@@ -68,6 +68,9 @@
 #define AI_BASELINE_SCANS 4
 // Scans recorded as labelled examples when teaching the network (`t` + 0-4).
 #define TEACH_SCANS 3
+// A pending `t` waits this long for its class number, then is cancelled, so a
+// later mode key (1-4) can't be mistaken for a training label.
+#define TEACH_TIMEOUT_MS 5000UL
 // RMS z-score above which a reading is reported as unusual for this wearer.
 #define NOVELTY_THRESHOLD 3.0f
 // RMS z-score above which a reading is outside the model's training data.

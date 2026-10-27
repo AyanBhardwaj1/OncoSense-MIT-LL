@@ -7,6 +7,7 @@
 // =============================================================================
 #pragma once
 
+#include <math.h>
 #include <stdint.h>
 
 namespace oncosense {
@@ -23,7 +24,8 @@ class Ema {
   explicit Ema(float alpha) : alpha_(alpha) {}
   float update(float x);
   void reset() { primed_ = false; }
-  float value() const { return value_; }
+  // NAN until the first valid sample, so "no trend yet" is never shown as 0.
+  float value() const { return primed_ ? value_ : NAN; }
 
  private:
   float alpha_;
@@ -52,6 +54,9 @@ const char *toString(HydrationState s);
 // depends on geometry and LED choice (see docs/03-optics-theory.md).
 // Returns NAN when the two references are too close to separate.
 float hydrationScore(float signal, float dryRef, float hydratedRef);
+
+// True when two references are far enough apart (>= 3 %) to score between.
+bool referencesSeparable(float dryRef, float hydratedRef);
 
 // Map a hydration score onto discrete states.
 HydrationState classifyScore(float score);
