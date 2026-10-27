@@ -65,5 +65,5 @@ jobs:
       - run: flake8 tools tests ml
       - run: python -m pytest tests -q -rf --junitxml=pytest-report.xml
       - name: Annotate failing tests
-        if: failure()
+        if: failure() && hashFiles('pytest-report.xml') != ''
         run: python .github/annotate_failures.py pytest-report.xml

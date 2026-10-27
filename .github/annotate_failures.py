@@ -1,6 +1,7 @@
 """Turn failing tests in a JUnit XML report into GitHub Actions annotations,
 so the reason for a red CI run is visible on the run page and via the API."""
 
+import os
 import sys
 import xml.etree.ElementTree as ET
 
@@ -10,6 +11,10 @@ def escape(text: str) -> str:
 
 
 def main(path: str) -> int:
+    if not os.path.exists(path):
+        # pytest never ran (an earlier step such as flake8 failed); that step's log says why.
+        print(f"No test report at {path}; nothing to annotate.")
+        return 0
     failures = 0
     for case in ET.parse(path).getroot().iter("testcase"):
         for problem in list(case.findall("failure")) + list(case.findall("error")):

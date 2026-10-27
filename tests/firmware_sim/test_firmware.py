@@ -422,3 +422,13 @@ def test_end_to_end_ai_session_to_logger_analyzer_and_training(harness, tmp_path
                           "--real", *map(str, files)], capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
     assert "Fine-tuning on" in res.stdout
+
+
+def test_class_digit_typed_during_a_measurement_is_still_a_teach_label(harness):
+    """Second review: the timeout fired before reading input that arrived while a
+    blocking AI measurement ran, so a digit typed 3 s after 't' switched mode."""
+    r = run(harness, BASE + ["send 4", "run 100", "send a", "run 100", "send t", "run 3000",
+                             "send 2", "run 6000", "send s", "run 10"])
+    assert r.status["mode"] == "ai"
+    assert r.status["model"]["personalized"] is True
+    assert not any("Teach timed out" in m for m in r.messages())
