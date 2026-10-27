@@ -44,6 +44,8 @@ void NeuralNet::resetHead() {
   personalized_ = false;
 }
 
+uint32_t NeuralNet::modelId() { return ONCOSENSE_MODEL_ID; }
+
 const char *NeuralNet::className(int i) {
   return (i >= 0 && i < kClasses) ? model::kClassNames[i] : "unknown";
 }

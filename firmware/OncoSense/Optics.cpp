@@ -17,7 +17,8 @@ const char *const kBandNames[kNumBands] = {
 };
 
 static const uint8_t kMaxPairs = 8;
-static const uint8_t kMaxGainRetries = 3;
+// Enough retries to walk from the highest to the lowest gain if needed.
+static const uint8_t kMaxGainRetries = AS7341_GAIN_512X;
 static const float kSaturationFraction = 0.90f;
 static const float kUnderRangeFraction = 0.10f;
 
