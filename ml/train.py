@@ -11,7 +11,7 @@ millisecond and to fine-tune its last layer on the band itself.
 
 Outputs
   firmware/OncoSense/model_weights.h   C++ weights + standardisation
-  ml/model.json                        same weights for the web app's demo mode
+  ml/model.json, app/model.json        same weights for the web app's demo mode
   tests/nn_test_vectors.h              inputs and expected outputs so the C++
                                        inference is checked against numpy
 
@@ -172,7 +172,8 @@ def export(params, mean, std, meta, X_test):
         "mean": mean.tolist(), "std": std.tolist(),
         "weights": [p.tolist() for p in params], "meta": meta,
     }
-    (ROOT / "ml/model.json").write_text(json.dumps(model, separators=(",", ":")))
+    for path in ("ml/model.json", "app/model.json"):
+        (ROOT / path).write_text(json.dumps(model, separators=(",", ":")))
 
     # Test vectors: raw features -> expected probabilities.
     raw = X_test[:6]
