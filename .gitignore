@@ -19,3 +19,8 @@ venv/
 .DS_Store
 .vscode/
 .idea/
+
+# UI tooling
+.ui-improve/
+.taste-skill/
+node_modules/

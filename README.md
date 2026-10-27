@@ -44,6 +44,7 @@ The project began with **nonlinear optics** (second harmonic generation from col
 | 🎯 [Calibration and usage](docs/06-calibration-and-usage.md) | Step-by-step use of each mode, logging, tuning, troubleshooting |
 | 🗺️ [Roadmap](docs/07-roadmap.md) | From the hydration proof of concept back to cancer screening |
 | 🧠 [Neural network](docs/08-neural-network.md) · [ml/](ml) | Firmware v3: multi-source features, on-device MLP, novelty detection, on-band learning |
+| 🖥️ [Web app](docs/09-web-app.md) · [app/](app) | OncoSense Monitor: browser dashboard that connects to the band over USB, with a virtual-band demo |
 | 🗂️ [Engineering portfolio](portfolio/README.md) | A one-page case study of the whole project |
 
 ## How it works
@@ -130,6 +131,22 @@ Mode **4 (AI)** reads the skin under **all three light sources**, extracts **12 
 
 → **[docs/08-neural-network.md](docs/08-neural-network.md)**
 
+## OncoSense Monitor (web app)
+
+> This branch, **`web-app`**, builds on the `neural-net` branch.
+
+<p align="center">
+  <img src="docs/images/app-live-ai.jpg" width="80%" alt="OncoSense Monitor showing a live AI reading with class probabilities">
+</p>
+
+The computer-side companion to the band. It runs in the browser, connects to the band over USB (Web Serial, Chrome or Edge), and shows the neural network's reading live with confidence and trust signals. It also walks you through calibration, teaches the network with one click, and records sessions to CSV. **No band? The virtual band runs the same protocol and the same network on simulated skin.**
+
+```bash
+python3 app/serve.py
+```
+
+That opens `http://localhost:8765`. Press **Connect band**, or **Try the virtual band**. → **[docs/09-web-app.md](docs/09-web-app.md)**
+
 ## Results
 
 | | |
@@ -156,6 +173,7 @@ OncoSense-MIT-LL/
 ├── firmware/
 │   ├── OncoSense/               ← firmware v3 (Optics, SkinModel, Features, NeuralNet, Novelty, Storage)
 │   └── legacy/                  ← original v1 sketches (MainSkin, AdaSpecCode)
+├── app/                         ← OncoSense Monitor web app (Web Serial dashboard + virtual band)
 ├── tools/                       ← Python serial logger and session analyzer
 ├── tests/                       ← host-side unit tests for the signal models
 └── .github/workflows/ci.yml     ← unit tests and firmware compile on every push

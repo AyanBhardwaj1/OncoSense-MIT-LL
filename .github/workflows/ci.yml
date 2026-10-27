@@ -42,6 +42,16 @@ jobs:
       - run: python -m py_compile tools/*.py
       - run: python tools/analyze_session.py --help
 
+  web-app:
+    name: Web app tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test app/tests/*.test.mjs
+
   ml:
     name: Neural network training pipeline
     runs-on: ubuntu-latest
