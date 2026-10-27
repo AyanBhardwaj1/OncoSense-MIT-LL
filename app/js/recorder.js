@@ -26,6 +26,7 @@ export class Recorder {
   add(reading) {
     if (!this.recording) return;
     this.rows.push({ received: new Date().toISOString(), ...reading });
+    this.exported = false;
   }
 
   get count() {

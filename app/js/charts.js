@@ -20,6 +20,15 @@ export const CLASS_LABELS = {
 
 // ------------------------------------------------------- probability bars --
 
+// The most probable class, ignoring missing / null / non-numeric values.
+export function topClass(probs) {
+  let best = null;
+  for (const [c, p] of Object.entries(probs ?? {})) {
+    if (Number.isFinite(p) && (best === null || p > probs[best])) best = c;
+  }
+  return best;
+}
+
 export class ProbabilityBars {
   constructor(container) {
     this.container = container;
@@ -27,6 +36,7 @@ export class ProbabilityBars {
   }
 
   setClasses(classes) {
+    if (!Array.isArray(classes)) return;
     if (this.classes && this.classes.join() === classes.join()) return;
     this.classes = classes;
     this.container.replaceChildren();
@@ -46,14 +56,13 @@ export class ProbabilityBars {
   }
 
   update(probs) {
-    const entries = Object.entries(probs);
-    const top = entries.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
-    for (const [c, p] of entries) {
-      const row = this.rows.get(c);
-      if (!row) continue;
+    const top = topClass(probs);
+    for (const [c, row] of this.rows) {
+      const p = probs?.[c];
+      const ok = Number.isFinite(p);
       row.dataset.top = String(c === top);
-      row.querySelector(".prob-fill").style.transform = `scaleX(${Math.max(0, Math.min(1, p))})`;
-      row.querySelector(".prob-value").textContent = fmtPct.format(p);
+      row.querySelector(".prob-fill").style.transform = `scaleX(${ok ? Math.max(0, Math.min(1, p)) : 0})`;
+      row.querySelector(".prob-value").textContent = ok ? fmtPct.format(p) : "–";
     }
   }
 }

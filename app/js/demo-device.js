@@ -88,8 +88,13 @@ export class DemoDevice {
 
   // ---------------------------------------------------------- commands --
 
-  async send(text) {
-    for (const c of text) await this.command(c);
+  // The firmware handles one command at a time and blocks during captures,
+  // so the virtual band queues commands the same way.
+  send(text) {
+    this.queue = (this.queue ?? Promise.resolve()).then(async () => {
+      for (const c of text) await this.command(c);
+    });
+    return this.queue;
   }
 
   async command(c) {
@@ -203,6 +208,11 @@ export class DemoDevice {
     this.busy = true;
     this.say(`# Teaching '${this.net.classes[label]}'. Hold still...`);
     await new Promise((r) => setTimeout(r, 1500));
+    if (!this.contact) {
+      this.say("# Teach failed: no clean readings. Check skin contact.");
+      this.busy = false;
+      return;
+    }
     let fit = NaN;
     for (let i = 0; i < 3; i++) {
       const x = extractFeatures(multiScan(this.person, this.skinNow(), this.rng), this.cal.aiBaseline);

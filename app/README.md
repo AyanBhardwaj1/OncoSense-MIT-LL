@@ -70,7 +70,14 @@ Both devices speak the firmware v3 serial protocol: one-character commands in, o
 node --test app/tests/*.test.mjs
 ```
 
-These check that the JavaScript feature extractor and network reproduce the **same test vectors** as the Python trainer and the C++ firmware. They also cover personalization, the virtual band's protocol, and the CSV/JSON export. CI runs them on every push.
+These check that the JavaScript feature extractor and network reproduce the **same test vectors** as the Python trainer and the C++ firmware. They also cover personalization, the virtual band's protocol, and the CSV/JSON export. They test the USB transport against a simulated Web Serial port too:
+
+* a rendering bug can't drop the connection
+* a fatal error releases the port so it can be reopened
+* non-fatal errors are survived
+* a port that keeps failing is shut down instead of retried forever
+
+CI runs them on every push.
 
 ## Design notes
 

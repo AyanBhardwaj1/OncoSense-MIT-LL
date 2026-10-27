@@ -15,6 +15,8 @@ const nf1 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1, minimum
 const nf0 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 const nfSig = new Intl.NumberFormat(undefined, { maximumSignificantDigits: 3 });
 const pct = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 0 });
+const pluralRules = new Intl.PluralRules("en");
+const readings = (n) => `${nf0.format(n)} ${pluralRules.select(n) === "one" ? "reading" : "readings"}`;
 const signedPct = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1, signDisplay: "exceptZero" });
 
 const DESCRIPTIONS = {
@@ -60,6 +62,7 @@ const state = {
   probs: new ProbabilityBars($("probs")),
   history: new History($("history")),
   toastTimer: null,
+  connecting: false,
 };
 
 // ------------------------------------------------------------- startup --
@@ -108,17 +111,28 @@ function init() {
 
 // ---------------------------------------------------------- connection --
 
+// Only one connection attempt at a time: a second click (or the demo button)
+// while the port picker is open must not race the first.
+function setConnecting(on) {
+  state.connecting = on;
+  $("connect").disabled = on || !SerialDevice.supported() || !window.isSecureContext;
+  $("demo").disabled = on;
+}
+
 async function connectSerial() {
+  if (state.connecting) return;
+  setConnecting(true);
   const device = new SerialDevice();
   setConnection("connecting", "Choose the band’s port…");
   try {
+    await state.device?.close();
     attach(device);
     await device.connect();
     setConnection("live", "Band connected over USB");
     showDashboard(false);
     await send(MODE_KEY[state.view]);
   } catch (err) {
-    state.device = null;
+    if (state.device === device) state.device = null;
     if (err.name === "NotFoundError") {
       setConnection("idle", "Not connected");
       toast("No port chosen. Press Connect band and pick the QT Py port.");
@@ -129,24 +143,30 @@ async function connectSerial() {
       setConnection("error", "Connection failed");
       toast(`Could not connect: ${err.message}. Unplug the band, plug it back in, and try again.`);
     }
+  } finally {
+    setConnecting(false);
   }
 }
 
 async function connectDemo() {
+  if (state.connecting) return;
+  setConnecting(true);
   try {
     state.net ??= await SkinNet.load("model.json");
+    await state.device?.close();
+    const device = new DemoDevice(state.net);
+    attach(device);
+    await device.connect();
+    setConnection("live", "Virtual band, simulated skin");
+    showDashboard(true);
+    await send("j");
+    await send(MODE_KEY[state.view]);
+    await send("s");
   } catch (err) {
-    toast(`Could not load the network weights (${err.message}). Serve the app folder over http.`);
-    return;
+    toast(`Could not start the virtual band (${err.message}). Serve the app folder over http.`);
+  } finally {
+    setConnecting(false);
   }
-  const device = new DemoDevice(state.net);
-  attach(device);
-  await device.connect();
-  setConnection("live", "Virtual band, simulated skin");
-  showDashboard(true);
-  await send("j");
-  await send(MODE_KEY[state.view]);
-  await send("s");
 }
 
 function attach(device) {
@@ -411,8 +431,8 @@ function setMeter(id, text, tone) {
   else el.removeAttribute("data-tone");
 }
 
-function renderFlags(flags = []) {
-  const items = flags.filter((f) => FLAG_TEXT[f]).map((f) => {
+function renderFlags(flags) {
+  const items = (Array.isArray(flags) ? flags : []).filter((f) => FLAG_TEXT[f]).map((f) => {
     const li = document.createElement("li");
     li.textContent = FLAG_TEXT[f][0];
     li.dataset.tone = FLAG_TEXT[f][1];
@@ -427,7 +447,7 @@ function renderReading(r) {
   state.hasReading = true;
   $("reading-meta").hidden = false;
   renderFlags(r.flags);
-  const noContact = r.flags?.includes("NO_CONTACT");
+  const noContact = Array.isArray(r.flags) && r.flags.includes("NO_CONTACT");
 
   if (r.type === "ai") {
     if (noContact) {
@@ -437,11 +457,11 @@ function renderReading(r) {
       setState(CLASS_LABELS[r.label] ?? r.label);
       $("reading-detail").textContent = DESCRIPTIONS[r.label] ?? "";
     }
-    setMeter("confidence", pct.format(r.confidence));
-    setMeter("novelty", r.novelty == null ? "Learning…" : nf1.format(r.novelty), r.novelty > 3 ? "warn" : null);
-    setMeter("ood", nf1.format(r.ood), r.ood > 3 ? "warn" : null);
+    setMeter("confidence", fmt(r.confidence, pct));
+    setMeter("novelty", r.novelty == null ? "Learning…" : fmt(r.novelty, nf1), r.novelty > 3 ? "warn" : null);
+    setMeter("ood", fmt(r.ood, nf1), r.ood > 3 ? "warn" : null);
     state.probs.update(r.probs);
-    const p = r.probs;
+    const p = r.probs ?? {};
     const dryWet = (p.very_dry ?? 0) + (p.dry ?? 0) + (p.normal ?? 0) + (p.well_hydrated ?? 0);
     if (!noContact && dryWet > 0.05) {
       state.history.push(((p.dry ?? 0) / 3 + (2 * (p.normal ?? 0)) / 3 + (p.well_hydrated ?? 0)) / dryWet);
@@ -599,9 +619,22 @@ function renderTeach() {
 
 function toggleRecording() {
   const rec = state.recorder;
+  const btn = $("record");
+  if (!rec.recording && rec.hasUnsaved && btn.dataset.armed !== "true") {
+    // Starting again would replace readings that were never exported.
+    btn.dataset.armed = "true";
+    $("record-label").textContent = `Press again to discard ${readings(rec.count)} not yet exported`;
+    btn.armTimer = setTimeout(() => {
+      btn.dataset.armed = "false";
+      $("record-label").textContent = "Record session";
+    }, 4000);
+    return;
+  }
+  clearTimeout(btn.armTimer);
+  btn.dataset.armed = "false";
   if (rec.recording) {
     rec.stop();
-    toast(`Recording stopped: ${nf0.format(rec.count)} readings. Export them from the Session panel.`);
+    toast(`Recording stopped: ${readings(rec.count)}. Export them from the Session panel.`);
   } else {
     rec.start();
   }
@@ -612,11 +645,10 @@ function toggleRecording() {
 
 function updateSessionStatus() {
   const rec = state.recorder;
-  const n = nf0.format(rec.count);
   $("session-status").textContent = rec.recording
-    ? `Recording: ${n} readings so far.`
+    ? `Recording: ${readings(rec.count)} so far.`
     : rec.count
-      ? `${n} readings recorded${rec.hasUnsaved ? ", not exported yet" : ""}.`
+      ? `${readings(rec.count)} recorded${rec.hasUnsaved ? ", not exported yet" : ""}.`
       : "Not recording. Recorded readings stay in this browser until you export them.";
   $("export-csv").disabled = rec.count === 0;
   $("export-jsonl").disabled = rec.count === 0;
