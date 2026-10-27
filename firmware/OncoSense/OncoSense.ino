@@ -127,10 +127,6 @@ void setup() {
 // ------------------------------------------------------------------- Loop --
 
 void loop() {
-  if (teachPending && millis() - teachPendingSince > TEACH_TIMEOUT_MS) {
-    teachPending = false;
-    info(F("Teach timed out: send t and the class number together, e.g. t2."));
-  }
   while (Serial.available()) {
     char c = Serial.read();
     if (c == '\r' || c == '\n' || c == ' ') continue;
@@ -145,6 +141,13 @@ void loop() {
       continue;
     }
     handleCommand(c);
+  }
+
+  // Checked only after draining input: a class number that arrived while a
+  // blocking measurement ran must still count as the teach label.
+  if (teachPending && millis() - teachPendingSince > TEACH_TIMEOUT_MS) {
+    teachPending = false;
+    info(F("Teach timed out: send t and the class number together, e.g. t2."));
   }
 
   if (streaming && millis() - lastMeasurementMs >= MEASUREMENT_PERIOD_MS) {

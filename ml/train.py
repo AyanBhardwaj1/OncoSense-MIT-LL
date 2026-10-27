@@ -197,7 +197,8 @@ def c_array(name, arr):
 
 def model_id(params, mean, std) -> int:
     """Fingerprint of the exported network (float32 bytes, CRC-32)."""
-    blob = b"".join(np.asarray(a, dtype=np.float32).tobytes() for a in [mean, std, *params])
+    # Little-endian float32 so the id is the same on every host.
+    blob = b"".join(np.asarray(a, dtype="<f4").tobytes() for a in [mean, std, *params])
     return zlib.crc32(blob) & 0xFFFFFFFF
 
 
