@@ -40,3 +40,15 @@ jobs:
       - run: pip install -r tools/requirements.txt
       - run: python -m py_compile tools/*.py
       - run: python tools/analyze_session.py --help
+
+  python-tests:
+    name: Firmware simulator + tools tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r tools/requirements.txt pytest flake8
+      - run: flake8 tools tests
+      - run: python -m pytest tests -q
