@@ -19,6 +19,6 @@ python ml/train.py
 python ml/train.py --real data/*.csv
 ```
 
-`--real` fine-tunes on AI-mode CSVs recorded with `tools/oncosense_logger.py --send 4c --label <class>`.
+`--real` fine-tunes on AI-mode CSVs recorded with `tools/oncosense_logger.py --send 4c --label <class>`. The label must be one of `very_dry`, `dry`, `normal`, `well_hydrated` or `occlusive`. Rows the band flagged `NO_CONTACT`, `SATURATED` or `AMBIENT_LEAK`, and rows with non-finite features, are never used. Files from other modes are skipped. The run fails, with a count of what was skipped, if nothing usable is left. The exported accuracy is re-measured after fine-tuning.
 
 Full write-up, including the honest limits of the simulated bootstrap model: [docs/08-neural-network.md](../docs/08-neural-network.md).
