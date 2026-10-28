@@ -2,6 +2,8 @@
 
 > Branch **`web-app`**. It builds on `neural-net` (firmware v3), which provides the JSON-lines protocol the app uses.
 
+**Live: https://oncosense-monitor.vercel.app**
+
 The band is only half the experience. The other half is what the wearer sees on their computer while wearing it. The **OncoSense Monitor** runs in the browser, connects straight to the band over USB with the Web Serial API, and needs no installer, drivers or build step.
 
 <p align="center">

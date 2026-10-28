@@ -6,7 +6,20 @@ The computer-side companion to the OncoSense Band. Plug the band in over USB and
   <img src="../docs/images/app-live-ai.jpg" width="80%" alt="OncoSense Monitor showing a live AI reading of well-hydrated skin with the network's class probabilities">
 </p>
 
-## Run it
+## Live
+
+**https://oncosense-monitor.vercel.app** is deployed on Vercel from this folder (static files, no build step).
+
+* Open it in any browser and press **Try the virtual band**.
+* To use a real band, open it in Chrome or Edge on a desktop and press **Connect band**. Vercel serves the site over HTTPS, which the browser requires for USB access.
+
+To redeploy after changing the app:
+
+```bash
+cd app && vercel deploy --prod
+```
+
+## Run it locally
 
 ```bash
 python3 app/serve.py
