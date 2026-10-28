@@ -6,6 +6,12 @@
 </p>
 
 <p align="center">
+  <a href="https://oncosense-monitor.vercel.app"><b>▶ Open the live OncoSense Monitor</b></a><br>
+  <sub>Try the virtual band in any browser, or plug in a real band (Chrome or Edge on desktop).</sub>
+</p>
+
+<p align="center">
+  <a href="https://oncosense-monitor.vercel.app"><img src="https://img.shields.io/badge/live%20demo-oncosense--monitor.vercel.app-111827?logo=vercel" alt="Live demo"></a>
   <a href="https://github.com/AyanBhardwaj1/OncoSense-MIT-LL/actions/workflows/ci.yml"><img src="https://github.com/AyanBhardwaj1/OncoSense-MIT-LL/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/MCU-Adafruit%20QT%20Py%20SAMD21-6f42c1" alt="MCU">
   <img src="https://img.shields.io/badge/sensor-AS7341%2010--channel-0e7490" alt="Sensor">
